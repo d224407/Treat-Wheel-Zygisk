@@ -1,4 +1,4 @@
-import { exec, fullScreen, toast } from '../kernelsu.js'
+import { exec, toast } from '../kernelsu.js'
 
 import { loadNavbar, setNavbar, whichCurrentPage } from './navbar.js'
 import { runMainPageTransition, runMiniPageEnter, runMiniPageLeave } from './animator.js'
@@ -379,13 +379,14 @@ function applyHTMLChanges(page, pageId) {
 
 export async function loadPage(pageId) {
   /* INFO: Ignore navigation to the same page or while another transition is still running. */
-  if (whichCurrentPage() === pageId) return false
+  const currentPage = whichCurrentPage()
+
+  if (currentPage === pageId) return false
   if (isPageTransitioning) return false
 
   isPageTransitioning = true
 
   try {
-    const currentPage = whichCurrentPage()
     setNavbar(pageId)
 
     const targetIsMiniPage = isMiniPage(pageId)
@@ -450,6 +451,11 @@ export async function loadPage(pageId) {
     return false
   } finally {
     isPageTransitioning = false
+
+    if (pageId === 'home' && currentPage !== 'home')
+      history.back()
+    else if (pageId !== 'home' && currentPage === 'home')
+      history.pushState(true, '', location.pathname)
   }
 }
 
@@ -479,8 +485,10 @@ export async function loadMiniPage(miniPageId, unloadCb) {
   /* INFO: Not allow it to interact with the page, just click to close */
   page_content.style.pointerEvents = navbar_support_div.style.pointerEvents = 'none'
 
-  window.onceTrueEvent('click', (event) => {
+  function cleanup(isClick) {
     if (utils.isDivOrInsideDiv(event.target, 'minipage_content')) return;
+
+    if (isClick) history.back()
 
     const minipage_content = document.getElementById('minipage_content')
     minipage_content.style.animation = 'fade-out 0.2s'
@@ -499,7 +507,11 @@ export async function loadMiniPage(miniPageId, unloadCb) {
     unloadCb()
 
     return true
-  })
+  }
+
+  window.onceTrueEvent('click', (event) => cleanup(true))
+  window.onceTrueEvent('popstate', () => cleanup(false))
+
 
   const minipage_content = document.getElementById('minipage_content')
   minipage_content.style.cssText = `
@@ -519,6 +531,8 @@ export async function loadMiniPage(miniPageId, unloadCb) {
       </div>
     </div>
   `
+
+  history.pushState(true, '', location.pathname)
 }
 
 export async function reloadPage() {
@@ -586,4 +600,10 @@ window.addEventListener('unhandledrejection', function (event) {
   console.error('Unhandled promise rejection:', event.reason)
 
   exec(`echo "Error (Unhandled Rejection): ${event.reason}\n\n${event.reason.stack}" > /data/adb/rezygisk/webui_error.log`)
+})
+
+window.addEventListener('popstate', async () => {
+  if (history.state !== null) return;
+
+  await loadPage('home')
 })
