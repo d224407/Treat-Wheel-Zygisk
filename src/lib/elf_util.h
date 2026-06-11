@@ -13,11 +13,6 @@ typedef void (*linker_simple_func_t)(void);
 typedef void (*linker_ctor_function_t)(int, char **, char **);
 typedef void (*linker_dtor_function_t)(void);
 
-struct symtabs {
-  char *name;
-  ElfW(Sym) *sym;
-};
-
 struct elf_img {
   char *elf;
   void *base;
@@ -58,7 +53,8 @@ struct elf_img {
   ElfW(Relr) *relr_;
   size_t relr_count_;
 
-  struct symtabs *symtabs_;
+  ElfW(Sym) **symtabs_;
+  size_t symtabs_count_;
 
   linker_ctor_function_t *preinit_array;
   size_t preinit_array_count;
