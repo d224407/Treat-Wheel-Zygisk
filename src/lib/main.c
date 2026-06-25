@@ -95,8 +95,20 @@ int my_munmap(void *addr, size_t length) {
 }
 
 void preSpecialize(const char *process_name) {
-  cfd = api_table->connectCompanion(api_table->impl);
-  if (cfd == -1) return;
+  int tmp_fd = api_table->connectCompanion(api_table->impl);
+  if (tmp_fd == -1)
+    return;
+
+  /* INFO: To not create fd gaps, we move the companion fd to a reserved high fd. 300 is random.  */
+  #define TW_CFD_RESERVED 300
+  if (dup2(tmp_fd, TW_CFD_RESERVED) == -1) {
+    PLOGE("dup2 companion fd to reserved high fd");
+
+    cfd = tmp_fd;
+  } else {
+    close(tmp_fd);
+    cfd = TW_CFD_RESERVED;
+  }
 
   api_table->exemptFd(cfd);
 
